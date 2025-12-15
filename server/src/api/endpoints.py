@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import logging
+import time
 from api.dependencies import get_mqtt_client, get_bd_handler
 
 log = logging.getLogger(__name__)
@@ -48,12 +49,16 @@ async def root():
 async def get_weight():
     """Получить все продукты из базы данных"""
     try:
-        mqtt_client = get_mqtt_client
+        mqtt_client = get_mqtt_client()
         if not mqtt_client:
             raise HTTPException(status_code=503, detail="mqtt client offline")
         mqtt_client.publish("get")
         weight = mqtt_client.wait_for_value()
-        return weight
+        return WeightResponse(
+            weight=weight,
+            unit="g",
+            timestamp=time.time()  # текущее время в секундах
+        )
     except Exception as e:
         log.error(f"Ошибка при получении продуктов: {e}")
         raise HTTPException(status_code=500, detail=str(e))
