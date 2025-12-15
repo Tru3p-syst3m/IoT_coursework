@@ -14,6 +14,9 @@
 // WiFi setting
 #define WIFI_SSID "BLESSING"
 #define WIFI_PASS "nice cock!"
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT      BIT1
+static EventGroupHandle_t s_wifi_event_group;
 static const char *WIFI_TAG = "WIFI";
 
 // HX711 setting
@@ -149,6 +152,22 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
   }
 }
 
+static void wifi_event_handler(void* arg, esp_event_base_t event_base,
+                               int32_t event_id, void* event_data) {
+  if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+    esp_wifi_connect();
+  } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+    xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+    xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+    ESP_LOGI(WIFI_TAG, "Failed to connect to WiFi, retrying...");
+    esp_wifi_connect();
+  } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+    ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+    ESP_LOGI(WIFI_TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
+    xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+  }
+}
+
 void wifi_connect_simple() {
   ESP_ERROR_CHECK(esp_netif_init());
   ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -172,6 +191,21 @@ void wifi_connect_simple() {
   ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
   ESP_ERROR_CHECK(esp_wifi_start());
   ESP_ERROR_CHECK(esp_wifi_connect());
+
+  ESP_LOGI(WIFI_TAG, "Connecting to WiFi...");
+    
+    // Ждем подключения с таймаутом
+    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
+            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+            pdFALSE,
+            pdFALSE,
+            portMAX_DELAY);
+
+    if (bits & WIFI_CONNECTED_BIT) {
+        ESP_LOGI(WIFI_TAG, "Successfully connected to WiFi");
+    } else if (bits & WIFI_FAIL_BIT) {
+        ESP_LOGE(WIFI_TAG, "Failed to connect to WiFi");
+    }
 }
 
 void app_main() {
