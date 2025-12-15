@@ -10,12 +10,13 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _limitController = TextEditingController(text: '100');
+  final _toleranceController = TextEditingController(text: '2');
   double? _currentWeight;
   double? _setLimit;
   bool _isLoading = false;
   String _statusMessage = 'Нажмите "Получить вес" или задайте лимит';
   Color _statusColor = Colors.grey;
-  final double _tolerance = 2.0; // Погрешность 2 грамма
+  double _tolerance = 2.0; // Погрешность 2 грамма
 
   final ApiService _apiService = ApiService();
 
@@ -62,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final difference = weight - _setLimit!;
 
-    if (weight > _setLimit!) {
+    if (weight > (_setLimit! + _tolerance)) {
       // Перевес
       _statusMessage =
           'ПЕРЕВЕС! Превышение на ${difference.abs().toStringAsFixed(2)} г';
@@ -91,6 +92,26 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _setLimit = limit;
       _statusMessage = 'Лимит установлен: $limit г';
+      _statusColor = Colors.blueGrey;
+    });
+
+    // Если уже есть текущий вес, обновляем статус
+    if (_currentWeight != null) {
+      _updateStatus(_currentWeight!);
+    }
+  }
+
+  void _setNewTolerance() {
+    final tolerance = double.tryParse(_toleranceController.text);
+
+    if (tolerance == null || tolerance <= 0) {
+      _showError('Введите корректный лимит (положительное число)');
+      return;
+    }
+
+    setState(() {
+      _tolerance = tolerance;
+      _statusMessage = 'погрешнгость установлена: $tolerance г';
       _statusColor = Colors.blueGrey;
     });
 
@@ -146,6 +167,34 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 10),
                         ElevatedButton.icon(
                           onPressed: _setNewLimit,
+                          icon: const Icon(Icons.save),
+                          label: const Text('Задать'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 15,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _toleranceController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Погрешность(граммы)',
+                              border: OutlineInputBorder(),
+                              suffixText: 'г',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: _setNewTolerance,
                           icon: const Icon(Icons.save),
                           label: const Text('Задать'),
                           style: ElevatedButton.styleFrom(

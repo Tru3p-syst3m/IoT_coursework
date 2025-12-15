@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 import logging
 import time
-from api.dependencies import get_mqtt_client, get_bd_handler
+from api.dependencies import get_mqtt_client
 
 log = logging.getLogger(__name__)
 
